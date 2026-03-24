@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ngola Talk</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0d0b08;
+    --surface: #161410;
+    --surface2: #1e1b16;
+    --border: rgba(255,220,140,0.12);
+    --gold: #e8b84b;
+    --gold2: #c9923a;
+    --red: #c94040;
+    --black: #1a0a0a;
+    --text: #f0e8d8;
+    --muted: rgba(240,232,216,0.45);
+    --accent: #3d7a5c;
+    --radius: 12px;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-body: 'DM Sans', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; line-height: 1.6; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 clamp(12px, 5vw, 40px); height: auto;
+    min-height: 64px;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px;
+    position: sticky; top: 0;
+    background: rgba(13,11,8,0.92); backdrop-filter: blur(12px); z-index: 100;
+  }
+  .logo { font-family: var(--font-display); font-size: clamp(18px, 4vw, 22px); font-weight: 700; color: var(--gold); }
+  .logo span { color: var(--text); font-weight: 400; font-size: clamp(11px, 2vw, 13px); margin-left: 6px; }
+  .conn-status { display: flex; align-items: center; gap: 7px; font-size: clamp(10px, 2vw, 12px); color: var(--muted); }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; flex-shrink: 0; }
+  .conn-dot.ok { background: #4caf82; }
+  .conn-dot.err { background: var(--red); }
+
+  .hero { padding: clamp(32px, 8vw, 64px) clamp(12px, 5vw, 40px) clamp(24px, 6vw, 48px); max-width: 860px; margin: 0 auto; text-align: center; }
+  .hero-tag { display: inline-block; padding: 4px 14px; border: 1px solid var(--gold2); color: var(--gold); font-size: clamp(9px, 2vw, 11px); letter-spacing: .15em; text-transform: uppercase; border-radius: 999px; margin-bottom: clamp(12px, 3vw, 20px); }
+  .hero h1 { font-family: var(--font-display); font-size: clamp(24px, 6vw, 52px); font-weight: 900; line-height: 1.1; margin-bottom: clamp(10px, 2vw, 14px); }
+  .hero h1 em { color: var(--gold); font-style: normal; }
+  .hero p { font-size: clamp(13px, 2.5vw, 15px); color: var(--muted); max-width: 520px; margin: 0 auto clamp(24px, 5vw, 36px); }
+
+  .stats { display: flex; justify-content: center; flex-wrap: wrap; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; max-width: 600px; margin: 0 auto clamp(32px, 6vw, 56px); gap: 0; }
+  .stat { flex: 1; min-width: clamp(100px, 22vw, 150px); padding: clamp(12px, 3vw, 16px) clamp(12px, 3vw, 20px); text-align: center; border-right: 1px solid var(--border); background: var(--surface); }
+  .stat:nth-child(odd):not(:last-child) { border-right: 1px solid var(--border); }
+  .stat:nth-child(even):not(:last-child) { border-right: 1px solid var(--border); }
+  @media (max-width: 600px) {
+    .stat { border-right: none; border-bottom: 1px solid var(--border); }
+    .stat:nth-child(odd):not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+    .stat:nth-child(even):not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+  .stat:last-child { border-right: none; border-bottom: none; }
+  .stat-n { font-family: var(--font-display); font-size: clamp(22px, 4vw, 26px); font-weight: 700; color: var(--gold); display: block; }
+  .stat-l { font-size: clamp(9px, 2vw, 11px); color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+
+  .main { max-width: 940px; margin: 0 auto; padding: 0 clamp(12px, 5vw, 40px) clamp(40px, 8vw, 80px); }
+
+  .tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; margin-bottom: clamp(20px, 4vw, 28px); flex-wrap: wrap; }
+  .tab { flex: 1; min-width: 80px; padding: clamp(8px, 2vw, 10px) clamp(10px, 3vw, 14px); border-radius: 9px; border: none; background: transparent; color: var(--muted); font-family: var(--font-body); font-size: clamp(11px, 2vw, 13px); font-weight: 500; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--surface2); color: var(--gold); border: 1px solid var(--border); }
+
+  .panel { display: none; animation: fadeIn .25s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: clamp(16px, 4vw, 28px); margin-bottom: 18px; }
+  .card-title { font-family: var(--font-display); font-size: clamp(16px, 3.5vw, 19px); font-weight: 700; margin-bottom: 4px; }
+  .card-sub { font-size: clamp(12px, 2.5vw, 13px); color: var(--muted); margin-bottom: clamp(16px, 3vw, 22px); }
+
+  label { display: block; font-size: clamp(9px, 2vw, 11px); font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+  .field { margin-bottom: 18px; }
+  select, input[type=text], textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: var(--font-body);
+    font-size: clamp(13px, 2vw, 14px); padding: clamp(8px, 2vw, 10px) clamp(10px, 2vw, 14px); outline: none; transition: border-color .2s;
+  }
+  select:focus, input[type=text]:focus, textarea:focus { border-color: var(--gold); }
+  textarea { resize: vertical; min-height: 84px; }
+  select option { background: var(--surface2); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 14px; }
+  @media (max-width: 600px) {
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  .recorder-ui { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: clamp(14px, 3vw, 18px); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .rec-btn { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--red); background: transparent; color: var(--red); font-size: clamp(20px, 4vw, 24px); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s; flex-shrink: 0; }
+  .rec-btn:hover { background: rgba(201,64,64,.12); }
+  .rec-btn.recording { background: var(--red); color: #fff; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(201,64,64,.4);} 50%{box-shadow:0 0 0 10px rgba(201,64,64,0);} }
+  .rec-timer { font-family: var(--font-display); font-size: clamp(20px, 4vw, 26px); color: var(--text); letter-spacing: .05em; }
+  .rec-status { font-size: clamp(11px, 2vw, 12px); color: var(--muted); }
+  .rec-waveform { width: 100%; height: 44px; background: var(--surface2); border-radius: 6px; display: flex; align-items: center; gap: 2px; padding: 8px 10px; overflow: hidden; min-height: 44px; }
+  .wave-bar { flex: 1; background: var(--gold); border-radius: 2px; height: 4px; opacity: 0.3; transition: height .08s; }
+  audio { width: 100%; border-radius: 6px; max-width: 100%; }
+
+  .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: clamp(24px, 6vw, 36px) clamp(12px, 4vw, 20px); text-align: center; cursor: pointer; transition: all .2s; background: var(--bg); }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--gold); background: rgba(232,184,75,.04); }
+  .drop-icon { font-size: clamp(24px, 6vw, 32px); margin-bottom: 8px; }
+  .drop-text { font-size: clamp(12px, 2.5vw, 13px); color: var(--muted); }
+  .drop-text strong { color: var(--gold); }
+  #img-preview { display: none; width: 100%; border-radius: 8px; margin-top: 10px; max-height: 300px; object-fit: cover; }
+
+  .btn-primary { width: 100%; padding: clamp(10px, 2.5vw, 13px); background: var(--gold); color: var(--black); border: none; border-radius: 8px; font-family: var(--font-body); font-size: clamp(13px, 2.5vw, 15px); font-weight: 500; cursor: pointer; transition: all .2s; }
+  .btn-primary:hover:not(:disabled) { background: var(--gold2); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-sec { padding: clamp(6px, 2vw, 8px) clamp(10px, 2vw, 14px); background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-body); font-size: clamp(11px, 2vw, 12px); cursor: pointer; transition: all .2s; white-space: nowrap; }
+  .btn-sec:hover { color: var(--text); border-color: var(--gold); }
+
+  .upload-bar { width: 100%; height: 3px; background: var(--surface2); border-radius: 999px; margin-top: 10px; overflow: hidden; display: none; }
+  .upload-fill { height: 100%; background: var(--gold); width: 0%; transition: width .4s; border-radius: 999px; }
+
+  #toast { position: fixed; bottom: clamp(12px, 4vw, 24px); left: clamp(12px, 5vw, 50%); right: clamp(12px, 5vw, auto); transform: translateX(0) translateY(20px); background: var(--accent); color: #fff; padding: clamp(8px, 2vw, 11px) clamp(14px, 3vw, 22px); border-radius: 999px; font-size: clamp(12px, 2vw, 13px); font-weight: 500; opacity: 0; transition: all .3s; z-index: 999; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateX(0) translateY(0); }
+  @media (min-width: 768px) {
+    #toast { left: 50%; right: auto; transform: translateX(-50%) translateY(20px); }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  }
+
+  .ds-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .ds-controls input { flex: 1; min-width: clamp(150px, 30vw, 200px); }
+  .ds-controls select { width: auto; min-width: auto; }
+  .ds-count { font-size: clamp(11px, 2vw, 12px); color: var(--muted); white-space: nowrap; }
+  .ds-table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: clamp(11px, 2vw, 13px); }
+  thead tr { background: var(--surface2); }
+  th { padding: clamp(8px, 2vw, 11px) clamp(8px, 2vw, 13px); text-align: left; font-size: clamp(9px, 2vw, 11px); font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: clamp(7px, 2vw, 10px) clamp(8px, 2vw, 13px); border-bottom: 1px solid rgba(255,220,140,.06); color: var(--text); vertical-align: middle; word-break: break-word; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,220,140,.03); }
+  .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font-size: clamp(9px, 2vw, 11px); font-weight: 500; white-space: nowrap; }
+  .badge-text { background: rgba(61,122,92,.2); color: #6fcca4; }
+  .badge-audio { background: rgba(201,64,64,.18); color: #f07070; }
+  .badge-image { background: rgba(232,184,75,.18); color: var(--gold); }
+  .badge-kim { background: rgba(232,184,75,.15); color: var(--gold); }
+  .badge-umb { background: rgba(61,122,92,.15); color: #6fcca4; }
+  .empty-state { padding: clamp(30px, 8vw, 50px) clamp(12px, 4vw, 20px); text-align: center; color: var(--muted); }
+  .loading-state { padding: clamp(24px, 6vw, 40px) clamp(12px, 4vw, 20px); text-align: center; color: var(--muted); }
+  .export-row { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; flex-wrap: wrap; }
+  .helper-tip { background: rgba(232,184,75,.06); border: 1px solid rgba(232,184,75,.15); border-radius: 8px; padding: clamp(8px, 2vw, 11px) clamp(10px, 2vw, 14px); font-size: clamp(11px, 2vw, 12px); color: var(--muted); margin-bottom: 16px; display: flex; gap: clamp(6px, 2vw, 9px); flex-wrap: wrap; align-items: flex-start; }
+  .helper-tip span:first-child { flex-shrink: 0; font-size: clamp(20px, 4vw, 24px); }
+  @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+  @media (max-width: 480px) {
+    header { padding: clamp(8px, 3vw, 16px); }
+    .hero { padding: clamp(24px, 6vw, 40px) clamp(12px, 4vw, 16px) clamp(20px, 5vw, 36px); }
+    .card { padding: clamp(14px, 4vw, 18px); }
+    .tabs .tab { min-width: 70px; padding: 8px 10px; }
+    .grid2 { gap: 10px; }
+    input[type=file] { font-size: 12px; }
+    table { font-size: 11px; }
+    th, td { padding: 6px 8px; }
+    .ds-controls { flex-direction: column; }
+    .ds-controls input, .ds-controls select { width: 100%; }
+    .export-row { gap: 6px; }
+    .btn-sec { flex: 1; }
+    .helper-tip { gap: 6px; font-size: 11px; }
+  }
+
+  @media (max-width: 600px) {
+    header { padding: clamp(8px, 3vw, 16px); }
+    .hero { padding: clamp(32px, 6vw, 40px) clamp(12px, 4vw, 16px) clamp(24px, 5vw, 36px); }
+    .card { padding: clamp(16px, 4vw, 18px); }
+    .grid2 { grid-template-columns: 1fr; gap: 12px; }
+    .tabs { flex-wrap: wrap; gap: 4px; padding: 3px; }
+    .tab { flex: 1; min-width: 60px; padding: 8px 8px; font-size: 12px; }
+    table { font-size: 12px; }
+    .ds-controls { flex-direction: column; }
+    .ds-controls input, .ds-controls select { width: 100%; }
+    .export-row { justify-content: center; }
+    .btn-primary, .btn-sec { width: auto; flex: 1; min-width: 100px; }
+    input[type=file] { font-size: 13px; }
+  }
+
+  @media (min-width: 601px) and (max-width: 768px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .tabs { gap: 6px; }
+    .tab { padding: 10px 12px; }
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .main { max-width: 100%; }
+    .grid2 { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (min-width: 1025px) {
+    .grid2 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Ngola Talk<span>— Recolha de Dados Linguísticos</span></div>
+  <div class="conn-status">
+    <div class="conn-dot" id="conn-dot"></div>
+    <span id="conn-label">A ligar...</span>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-tag">✦ Projecto de Preservação Cultural ✦</div>
+  <h1>As nossas línguas<br>merecem <em>viver</em> no digital</h1>
+  <p>Regista traduções, áudio e imagens em Kimbundu e Umbundu. Os dados ficam guardados na nuvem, acessíveis a toda a equipa.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="stat-n" id="cnt-total">—</span><span class="stat-l">Total</span></div>
+  <div class="stat"><span class="stat-n" id="cnt-text">—</span><span class="stat-l">Textos</span></div>
+  <div class="stat"><span class="stat-n" id="cnt-audio">—</span><span class="stat-l">Áudios</span></div>
+  <div class="stat"><span class="stat-n" id="cnt-image">—</span><span class="stat-l">Imagens</span></div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('text',this)">✍️ Texto</button>
+    <button class="tab" onclick="switchTab('audio',this)">🎙️ Áudio</button>
+    <button class="tab" onclick="switchTab('image',this)">🖼️ Imagem</button>
+    <button class="tab" onclick="switchTab('dataset',this)">📊 Dataset</button>
+  </div>
+
+  <!-- TEXT -->
+  <div class="panel active" id="panel-text">
+    <div class="card">
+      <div class="card-title">Registo de Tradução Textual</div>
+      <div class="card-sub">Insere a frase em português e a tradução correspondente.</div>
+      <div class="helper-tip"><span>💡</span><span>Prefere frases do dia-a-dia: saudações, família, comida, trabalho. Frases curtas e naturais são mais valiosas para treinar modelos de IA.</span></div>
+      <div class="grid2">
+        <div class="field"><label>Língua de destino</label>
+          <select id="t-lang"><option value="Kimbundu">Kimbundu</option><option value="Umbundu">Umbundu</option></select></div>
+        <div class="field"><label>Domínio</label>
+          <select id="t-domain"><option>Saudação</option><option>Família</option><option>Comida</option><option>Natureza</option><option>Trabalho</option><option>Provérbio</option><option>Religião</option><option>Outro</option></select></div>
+      </div>
+      <div class="field"><label>Frase em Português</label><textarea id="t-pt" placeholder="Ex: Bom dia, como estás?"></textarea></div>
+      <div class="field"><label>Tradução em Kimbundu / Umbundu</label><textarea id="t-local" placeholder="Escreve a tradução aqui..."></textarea></div>
+      <div class="field"><label>Notas de pronúncia (opcional)</label><input type="text" id="t-notes" placeholder="Ex: o 'ng' pronuncia-se como em 'finge'"></div>
+      <div class="field"><label>O teu nome ou alcunha</label><input type="text" id="t-contributor" placeholder="Ex: Ngola ou anónimo"></div>
+      <div class="upload-bar" id="t-bar"><div class="upload-fill" id="t-fill"></div></div>
+      <button class="btn-primary" id="t-btn" onclick="submitText()">Enviar Contribuição →</button>
+    </div>
+  </div>
+
+  <!-- AUDIO -->
+  <div class="panel" id="panel-audio">
+    <div class="card">
+      <div class="card-title">Gravação de Áudio</div>
+      <div class="card-sub">Grava a pronúncia de palavras ou frases. O ficheiro vai para a nuvem.</div>
+      <div class="helper-tip"><span>🎯</span><span>Ambiente silencioso, microfone próximo. Podes gravar várias vezes e guardar a melhor.</span></div>
+      <div class="grid2">
+        <div class="field"><label>Língua</label><select id="a-lang"><option value="Kimbundu">Kimbundu</option><option value="Umbundu">Umbundu</option></select></div>
+        <div class="field"><label>Domínio</label><select id="a-domain"><option>Saudação</option><option>Família</option><option>Comida</option><option>Natureza</option><option>Trabalho</option><option>Provérbio</option><option>Outro</option></select></div>
+      </div>
+      <div class="field"><label>Texto a gravar (língua local)</label><textarea id="a-local" placeholder="Escreve o texto que vais gravar..."></textarea></div>
+      <div class="field"><label>Tradução em Português</label><textarea id="a-pt" placeholder="Significado em português..."></textarea></div>
+      <div class="field">
+        <label>Gravação</label>
+        <div class="recorder-ui">
+          <div class="rec-waveform" id="waveform"></div>
+          <div class="rec-timer" id="rec-timer">0:00</div>
+          <button class="rec-btn" id="rec-btn" onclick="toggleRecording()">⏺</button>
+          <div class="rec-status" id="rec-status">Clica para gravar</div>
+          <audio id="audio-playback" controls style="display:none;width:100%;"></audio>
+        </div>
+      </div>
+      <div class="field"><label>Ou faz upload de um ficheiro de áudio</label>
+        <input type="file" id="a-file" accept="audio/*" style="color:var(--muted);font-size:13px;" onchange="handleAudioFile(this)"></div>
+      <div class="field"><label>Contribuinte</label><input type="text" id="a-contributor" placeholder="Nome ou anónimo"></div>
+      <div class="upload-bar" id="a-bar"><div class="upload-fill" id="a-fill"></div></div>
+      <button class="btn-primary" id="a-btn" onclick="submitAudio()">Guardar áudio no Supabase →</button>
+    </div>
+  </div>
+
+  <!-- IMAGE -->
+  <div class="panel" id="panel-image">
+    <div class="card">
+      <div class="card-title">Imagem com Legenda</div>
+      <div class="card-sub">Fotografias de objectos, alimentos ou actividades com legenda nas línguas locais.</div>
+      <div class="helper-tip"><span>📸</span><span>Imagens de objectos reais e actividades tradicionais são extremamente valiosas para datasets multimodais.</span></div>
+      <div class="grid2">
+        <div class="field"><label>Língua</label><select id="i-lang"><option value="Kimbundu">Kimbundu</option><option value="Umbundu">Umbundu</option></select></div>
+        <div class="field"><label>Domínio</label><select id="i-domain"><option>Objecto</option><option>Alimento</option><option>Natureza</option><option>Actividade</option><option>Cultura</option><option>Outro</option></select></div>
+      </div>
+      <div class="field">
+        <label>Imagem</label>
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('i-file').click()"
+             ondragover="handleDragOver(event)" ondragleave="handleDragLeave()" ondrop="handleDrop(event)">
+          <div class="drop-icon">🖼️</div>
+          <div class="drop-text"><strong>Clica para seleccionar</strong> ou arrasta aqui</div>
+          <div class="drop-text" style="margin-top:4px;">JPG, PNG, WEBP</div>
+          <input type="file" id="i-file" accept="image/*" style="display:none" onchange="handleImageFile(this)">
+        </div>
+        <img id="img-preview" alt="Pré-visualização">
+      </div>
+      <div class="field"><label>Palavra / frase em língua local</label><input type="text" id="i-local" placeholder="Ex: mukua"></div>
+      <div class="field"><label>Tradução em Português</label><input type="text" id="i-pt" placeholder="Ex: goiaba"></div>
+      <div class="field"><label>Descrição da imagem</label><input type="text" id="i-desc" placeholder="Ex: goiaba madura numa cesta de verga"></div>
+      <div class="field"><label>Contribuinte</label><input type="text" id="i-contributor" placeholder="Nome ou anónimo"></div>
+      <div class="upload-bar" id="i-bar"><div class="upload-fill" id="i-fill"></div></div>
+      <button class="btn-primary" id="i-btn" onclick="submitImage()">Guardar imagem no Supabase →</button>
+    </div>
+  </div>
+
+  <!-- DATASET -->
+  <div class="panel" id="panel-dataset">
+    <div class="card">
+      <div class="card-title">Dataset na Nuvem</div>
+      <div class="card-sub">Todas as entradas guardadas no Supabase. Partilhável com toda a equipa.</div>
+      <div class="ds-controls">
+        <input type="text" id="ds-search" placeholder="🔍  Pesquisar..." oninput="loadDataset()">
+        <select onchange="dsFilterType=this.value;loadDataset()" style="width:auto;">
+          <option value="">Todos os tipos</option>
+          <option value="text">Texto</option>
+          <option value="audio">Áudio</option>
+          <option value="image">Imagem</option>
+        </select>
+        <select onchange="dsFilterLang=this.value;loadDataset()" style="width:auto;">
+          <option value="">Todas as línguas</option>
+          <option value="Kimbundu">Kimbundu</option>
+          <option value="Umbundu">Umbundu</option>
+        </select>
+        <button class="btn-sec" onclick="loadDataset()">↻ Actualizar</button>
+        <span class="ds-count" id="ds-count"></span>
+      </div>
+      <div class="ds-table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Tipo</th><th>Língua</th>
+            <th>Português</th><th>Língua local</th>
+            <th>Domínio</th><th>Contribuinte</th><th>Data</th><th>Ficheiros</th>
+          </tr></thead>
+          <tbody id="ds-tbody"></tbody>
+        </table>
+        <div class="empty-state" id="ds-empty" style="display:none">
+          <div style="font-size:36px;margin-bottom:10px">📭</div>
+          <div>Nenhuma entrada ainda.<br>Começa por adicionar texto, áudio ou imagens.</div>
+        </div>
+        <div class="loading-state" id="ds-loading">
+          <div style="font-size:28px;margin-bottom:10px;animation:spin 1s linear infinite;display:inline-block">⟳</div>
+          <div>A carregar dados do Supabase...</div>
+        </div>
+      </div>
+      <div class="export-row">
+        <button class="btn-sec" onclick="exportCSV()">⬇ CSV</button>
+        <button class="btn-sec" onclick="exportJSON()">⬇ JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://svynhszdfcmehpnigrlf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2eW5oc3pkZmNtZWhwbmlncmxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwMTQ0OTUsImV4cCI6MjA4OTU5MDQ5NX0.UuybH2JUSUf1bD-lOYC2ZCZExojw6HpyPI3pmquXE9s';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// CONNECTION CHECK
+async function checkConnection() {
+  const dot = document.getElementById('conn-dot');
+  const lbl = document.getElementById('conn-label');
+  try {
+    const { error } = await sb.from('lulendo_entries').select('id', { count: 'exact', head: true });
+    if (error) throw error;
+    dot.className = 'conn-dot ok';
+    lbl.textContent = 'Supabase ligado ✓';
+    loadStats();
+  } catch(e) {
+    dot.className = 'conn-dot err';
+    lbl.textContent = 'Sem ligação';
+  }
+}
+
+// TABS
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'dataset') loadDataset();
+}
+
+// STATS
+async function loadStats() {
+  const run = async (filter) => {
+    let q = sb.from('lulendo_entries').select('*', { count: 'exact', head: true });
+    if (filter) q = q.eq('type', filter);
+    const { count } = await q;
+    return count ?? 0;
+  };
+  const [total, texts, audios, images] = await Promise.all([run(null), run('text'), run('audio'), run('image')]);
+  document.getElementById('cnt-total').textContent = total;
+  document.getElementById('cnt-text').textContent = texts;
+  document.getElementById('cnt-audio').textContent = audios;
+  document.getElementById('cnt-image').textContent = images;
+}
+
+// HELPERS
+function setLoading(btnId, barId, fillId, on, label) {
+  const btn = document.getElementById(btnId);
+  const bar = document.getElementById(barId);
+  const fill = document.getElementById(fillId);
+  btn.disabled = on;
+  if (on) { btn.dataset.orig = btn.textContent; btn.textContent = 'A guardar...'; }
+  else { btn.textContent = label || btn.dataset.orig || btn.textContent; }
+  bar.style.display = on ? 'block' : 'none';
+  if (on) { fill.style.width = '0%'; setTimeout(() => fill.style.width = '65%', 80); }
+  else { fill.style.width = '100%'; setTimeout(() => { bar.style.display='none'; fill.style.width='0%'; }, 500); }
+}
+
+function showToast(msg, ok=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = ok ? '#3d7a5c' : 'var(--red)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+// TEXT
+async function submitText() {
+  const pt = document.getElementById('t-pt').value.trim();
+  const local = document.getElementById('t-local').value.trim();
+  if (!pt || !local) { showToast('⚠ Preenche o texto e a tradução.', false); return; }
+  setLoading('t-btn','t-bar','t-fill', true);
+  const { error } = await sb.from('lulendo_entries').insert({
+    type:'text', lang: document.getElementById('t-lang').value,
+    domain: document.getElementById('t-domain').value,
+    portuguese: pt, local_language: local,
+    notes: document.getElementById('t-notes').value.trim() || null,
+    contributor: document.getElementById('t-contributor').value.trim() || 'Anónimo'
+  });
+  setLoading('t-btn','t-bar','t-fill', false, 'Guardar no Supabase →');
+  if (error) { showToast('❌ Erro: ' + error.message, false); return; }
+  document.getElementById('t-pt').value = '';
+  document.getElementById('t-local').value = '';
+  document.getElementById('t-notes').value = '';
+  showToast('✓ Texto guardado no Supabase!');
+  loadStats();
+}
+
+// AUDIO RECORDER
+let mediaRecorder, audioChunks = [], recInterval, recSeconds = 0;
+let recordedBlob = null, uploadedAudioBlob = null;
+
+const wf = document.getElementById('waveform');
+for (let i=0; i<36; i++) { const b=document.createElement('div'); b.className='wave-bar'; wf.appendChild(b); }
+
+function animateBars(active) {
+  document.querySelectorAll('.wave-bar').forEach(b => {
+    b.style.height = active ? (Math.random()*30+4)+'px' : '4px';
+    b.style.opacity = active ? '0.7' : '0.3';
+  });
+}
+
+async function toggleRecording() {
+  const btn = document.getElementById('rec-btn');
+  if (mediaRecorder && mediaRecorder.state==='recording') {
+    mediaRecorder.stop(); clearInterval(recInterval);
+    btn.classList.remove('recording'); btn.textContent='⏺';
+    document.getElementById('rec-status').textContent='Gravação concluída';
+    animateBars(false);
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+      audioChunks=[]; recordedBlob=null;
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        recordedBlob = new Blob(audioChunks, { type:'audio/webm' });
+        const ap = document.getElementById('audio-playback');
+        ap.src = URL.createObjectURL(recordedBlob); ap.style.display='block';
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorder.start();
+      btn.classList.add('recording'); btn.textContent='⏹';
+      document.getElementById('rec-status').textContent='A gravar...';
+      recSeconds=0;
+      recInterval = setInterval(() => {
+        recSeconds++;
+        const m=Math.floor(recSeconds/60), s=recSeconds%60;
+        document.getElementById('rec-timer').textContent = m+':'+String(s).padStart(2,'0');
+        animateBars(true);
+      }, 1000);
+    } catch(e) { showToast('⚠ Microfone não acessível. Verifica as permissões.', false); }
+  }
+}
+
+function handleAudioFile(input) {
+  const f=input.files[0]; if(!f) return;
+  uploadedAudioBlob=f;
+  const ap=document.getElementById('audio-playback');
+  ap.src=URL.createObjectURL(f); ap.style.display='block';
+  document.getElementById('rec-status').textContent='Ficheiro: '+f.name;
+}
+
+async function submitAudio() {
+  const local=document.getElementById('a-local').value.trim();
+  const pt=document.getElementById('a-pt').value.trim();
+  if (!local||!pt) { showToast('⚠ Preenche o texto e a tradução.',false); return; }
+  const blob=recordedBlob||uploadedAudioBlob;
+  setLoading('a-btn','a-bar','a-fill',true);
+  let audio_url=null;
+  if (blob) {
+    const fname='audio_'+Date.now()+'.webm';
+    const { error:ue } = await sb.storage.from('lulendo-media').upload('audio/'+fname, blob, { contentType:blob.type||'audio/webm' });
+    if (ue) { setLoading('a-btn','a-bar','a-fill',false,'Guardar áudio no Supabase →'); showToast('❌ Upload falhou: '+ue.message,false); return; }
+    audio_url = sb.storage.from('lulendo-media').getPublicUrl('audio/'+fname).data.publicUrl;
+  }
+  const { error } = await sb.from('lulendo_entries').insert({
+    type:'audio', lang:document.getElementById('a-lang').value,
+    domain:document.getElementById('a-domain').value,
+    portuguese:pt, local_language:local, audio_url,
+    contributor:document.getElementById('a-contributor').value.trim()||'Anónimo'
+  });
+  setLoading('a-btn','a-bar','a-fill',false,'Guardar áudio no Supabase →');
+  if (error) { showToast('❌ Erro: '+error.message,false); return; }
+  document.getElementById('a-local').value='';
+  document.getElementById('a-pt').value='';
+  document.getElementById('audio-playback').style.display='none';
+  document.getElementById('rec-timer').textContent='0:00';
+  document.getElementById('rec-status').textContent='Clica para gravar';
+  recordedBlob=null; uploadedAudioBlob=null;
+  showToast('✓ Áudio guardado no Supabase!');
+  loadStats();
+}
+
+// IMAGE
+let imageFile=null;
+function handleImageFile(input) {
+  const f=input.files[0]; if(!f) return; imageFile=f;
+  const r=new FileReader();
+  r.onload=e=>{ const img=document.getElementById('img-preview'); img.src=e.target.result; img.style.display='block'; };
+  r.readAsDataURL(f);
+}
+function handleDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('dragover'); }
+function handleDragLeave() { document.getElementById('drop-zone').classList.remove('dragover'); }
+function handleDrop(e) {
+  e.preventDefault(); handleDragLeave();
+  const f=e.dataTransfer.files[0];
+  if (f&&f.type.startsWith('image/')) { imageFile=f; handleImageFile({files:[f]}); }
+}
+
+async function submitImage() {
+  const local=document.getElementById('i-local').value.trim();
+  const pt=document.getElementById('i-pt').value.trim();
+  if (!local||!pt) { showToast('⚠ Preenche a palavra e a tradução.',false); return; }
+  setLoading('i-btn','i-bar','i-fill',true);
+  let image_url=null;
+  if (imageFile) {
+    const ext=imageFile.name.split('.').pop();
+    const fname='img_'+Date.now()+'.'+ext;
+    const { error:ue } = await sb.storage.from('lulendo-media').upload('images/'+fname, imageFile, { contentType:imageFile.type });
+    if (ue) { setLoading('i-btn','i-bar','i-fill',false,'Guardar imagem no Supabase →'); showToast('❌ Upload falhou: '+ue.message,false); return; }
+    image_url = sb.storage.from('lulendo-media').getPublicUrl('images/'+fname).data.publicUrl;
+  }
+  const { error } = await sb.from('lulendo_entries').insert({
+    type:'image', lang:document.getElementById('i-lang').value,
+    domain:document.getElementById('i-domain').value,
+    portuguese:pt, local_language:local,
+    description:document.getElementById('i-desc').value.trim()||null,
+    image_url,
+    contributor:document.getElementById('i-contributor').value.trim()||'Anónimo'
+  });
+  setLoading('i-btn','i-bar','i-fill',false,'Guardar imagem no Supabase →');
+  if (error) { showToast('❌ Erro: '+error.message,false); return; }
+  document.getElementById('i-local').value='';
+  document.getElementById('i-pt').value='';
+  document.getElementById('i-desc').value='';
+  document.getElementById('img-preview').style.display='none';
+  imageFile=null;
+  showToast('✓ Imagem guardada no Supabase!');
+  loadStats();
+}
+
+// DATASET
+let dsFilterType='', dsFilterLang='';
+async function loadDataset() {
+  document.getElementById('ds-loading').style.display='block';
+  document.getElementById('ds-empty').style.display='none';
+  document.getElementById('ds-tbody').innerHTML='';
+  const q=document.getElementById('ds-search').value.trim();
+  let query=sb.from('lulendo_entries').select('*').order('created_at',{ascending:false}).limit(300);
+  if (dsFilterType) query=query.eq('type',dsFilterType);
+  if (dsFilterLang) query=query.eq('lang',dsFilterLang);
+  if (q) query=query.or(`portuguese.ilike.%${q}%,local_language.ilike.%${q}%,contributor.ilike.%${q}%`);
+  const { data,error }=await query;
+  document.getElementById('ds-loading').style.display='none';
+  if (error||!data) { showToast('❌ Erro ao carregar dados.',false); return; }
+  document.getElementById('ds-count').textContent=data.length+' entrada'+(data.length!==1?'s':'');
+  if (!data.length) { document.getElementById('ds-empty').style.display='block'; return; }
+  document.getElementById('ds-tbody').innerHTML=data.map((d,i)=>`
+    <tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><span class="badge badge-${d.type}">${d.type==='text'?'✍️ texto':d.type==='audio'?'🎙️ áudio':'🖼️ imagem'}</span></td>
+      <td><span class="badge ${d.lang==='Kimbundu'?'badge-kim':'badge-umb'}">${d.lang}</span></td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.portuguese)}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.local_language)}</td>
+      <td style="color:var(--muted)">${esc(d.domain||'')}</td>
+      <td style="color:var(--muted)">${esc(d.contributor||'')}</td>
+      <td style="color:var(--muted);font-size:11px">${new Date(d.created_at).toLocaleDateString('pt-AO')}</td>
+      <td style="white-space:nowrap">
+        ${d.audio_url?`<a href="${d.audio_url}" target="_blank" style="color:var(--gold);font-size:11px;text-decoration:none">▶ áudio</a> `:''}
+        ${d.image_url?`<a href="${d.image_url}" target="_blank" style="color:var(--gold);font-size:11px;text-decoration:none">🖼</a>`:''}
+      </td>
+    </tr>`).join('');
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function exportJSON() {
+  const { data }=await sb.from('lulendo_entries').select('id,type,lang,domain,portuguese,local_language,notes,description,audio_url,image_url,contributor,created_at').order('created_at');
+  if (!data?.length){showToast('⚠ Nenhum dado para exportar.',false);return;}
+  dlBlob(new Blob([JSON.stringify({dataset_name:'Lulendo — Kimbundu & Umbundu',version:'0.1',exported:new Date().toISOString(),total:data.length,entries:data},null,2)],{type:'application/json'}),'lulendo_dataset.json');
+}
+async function exportCSV() {
+  const { data }=await sb.from('lulendo_entries').select('id,type,lang,domain,portuguese,local_language,notes,description,audio_url,image_url,contributor,created_at').order('created_at');
+  if (!data?.length){showToast('⚠ Nenhum dado para exportar.',false);return;}
+  const cols=['id','type','lang','domain','portuguese','local_language','notes','description','audio_url','image_url','contributor','created_at'];
+  const csv=[cols.join(','),...data.map(d=>cols.map(c=>'"'+String(d[c]||'').replace(/"/g,'""')+'"').join(','))].join('\n');
+  dlBlob(new Blob([csv],{type:'text/csv;charset=utf-8'}),'lulendo_dataset.csv');
+}
+function dlBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();showToast('⬇ '+name+' exportado!');}
+
+checkConnection();
+</script>
+</body>
+</html>
